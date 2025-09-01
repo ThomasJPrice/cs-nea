@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const bcrypt = require('bcrypt')
+const logger = require('../config/logger')
 
 require('dotenv').config()
 
@@ -30,12 +31,14 @@ router.get('/me', (req, res) => {
     req.db.get("SELECT id, email, created_at FROM users WHERE id = ?", [decoded.userId])
       .then((user) => {
         if (!user) {
+          logger.warn("User not found for /me");
           return res.status(404).send("User not found");
         }
+        logger.info(`User profile fetched for userId=${decoded.userId}`);
         res.status(200).json(user);
       })
       .catch((err) => {
-        console.error("Error fetching user for /me:", err);
+        logger.error("Error fetching user for /me: " + err);
         return res.status(500).send("Internal server error");
       });
   });
@@ -51,27 +54,29 @@ router.post('/register', (req, res) => {
   // verify email using regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/ // TO BE CHANGED with design section
   if (!emailRegex.test(body.email)) {
+    logger.warn(`Invalid email format attempted: ${body.email}`);
     return res.status(400).send("Invalid email format")
   }
 
   // hashing password
   bcrypt.hash(body.password, 10, (err, hash) => {
     if (err) {
-      console.error("Error hashing password:", err)
+      logger.error("Error hashing password: " + err)
       return res.status(500).send("Internal server error")
     }
 
     // adding to db
     req.db.run("INSERT INTO users (email, password_hash) VALUES (?, ?);", [body.email, hash])
       .then((value) => {
-        console.log('User inserted with ID:', value.lastID);
+        logger.info(`User registered with ID: ${value.lastID}`);
         return res.status(200).send("User registered successfully");
       }).catch((err) => {
         if (err.code === 'SQLITE_CONSTRAINT') {
+          logger.warn(`Attempt to register duplicate email: ${body.email}`);
           return res.status(409).send("Email exists");
         }
 
-        console.error("Error saving user to database:", err);
+        logger.error("Error saving user to database: " + err);
         return res.status(500).send("Internal server error");
       });
   });
@@ -87,16 +92,18 @@ router.post('/login', (req, res) => {
   req.db.get("SELECT * FROM users WHERE email = ?", [body.email])
     .then((user) => {
       if (!user) {
+        logger.warn(`Login attempt with invalid email: ${body.email}`);
         return res.status(401).send("Invalid email or password");
       }
 
       bcrypt.compare(body.password, user.password_hash, (err, result) => {
         if (err) {
-          console.error("Error comparing passwords:", err);
+          logger.error("Error comparing passwords: " + err);
           return res.status(500).send("Internal server error");
         }
 
         if (!result) {
+          logger.warn(`Login attempt with invalid password for email: ${body.email}`);
           return res.status(401).send("Invalid email or password");
         }
 
@@ -110,16 +117,17 @@ router.post('/login', (req, res) => {
 
         req.db.run("INSERT INTO sessions (user_id, refresh_token) VALUES (?, ?);", [user.id, refreshToken])
           .then(() => {
+            logger.info(`User logged in: ${user.email}`);
             res.status(200).send({ accessToken, refreshToken });
           })
           .catch((err) => {
-            console.error("Error saving refresh token to database:", err);
+            logger.error("Error saving refresh token to database: " + err);
             return res.status(500).send("Internal server error");
           });
       });
     })
     .catch((err) => {
-      console.error("Error fetching user:", err);
+      logger.error("Error fetching user: " + err);
       return res.status(500).send("Internal server error");
     });
 });
@@ -137,12 +145,14 @@ router.post('/logout', (req, res) => {
   )
     .then(({ changes }) => {
       if (changes === 0) {
+        logger.warn("Logout attempt for non-existent or already revoked session");
         return res.status(400).send("Session not found or already revoked");
       }
+      logger.info("Session revoked for refresh token");
       res.status(200).send("Logged out successfully");
     })
     .catch((err) => {
-      console.error("Error revoking session:", err);
+      logger.error("Error revoking session: " + err);
       return res.status(500).send("Internal server error");
     });
 })
@@ -160,6 +170,7 @@ router.post('/refresh', (req, res) => {
   )
     .then((session) => {
       if (!session) {
+        logger.warn("Invalid refresh token used for refresh endpoint");
         return res.status(401).send("Invalid refresh token");
       }
 
@@ -168,6 +179,7 @@ router.post('/refresh', (req, res) => {
         [session.user_id]
       ).then((user) => {
         if (!user) {
+          logger.warn("User not found for refresh endpoint");
           return res.status(401).send("User not found");
         }
 
@@ -177,15 +189,15 @@ router.post('/refresh', (req, res) => {
           JWT_SECRET,
           { expiresIn: '15m' }
         );
-
+        logger.info(`Access token refreshed for userId=${user.id}`);
         res.status(200).send({ accessToken });
       }).catch((err) => {
-        console.error("Error fetching user for refresh:", err);
+        logger.error("Error fetching user for refresh: " + err);
         return res.status(500).send("Internal server error");
       })
     })
     .catch((err) => {
-      console.error("Error fetching session:", err);
+      logger.error("Error fetching session: " + err);
       return res.status(500).send("Internal server error");
     });
 })

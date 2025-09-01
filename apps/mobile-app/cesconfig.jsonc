@@ -1,8 +1,8 @@
 // This is an optional configuration file used primarily for debugging purposes when reporting issues.
 // It is safe to delete this file as it does not affect the functionality of your application.
 {
-  "cesVersion": "2.18.6",
-  "projectName": "cs-nea",
+  "cesVersion": "2.18.7",
+  "projectName": "led-display-controller",
   "packages": [
     {
       "name": "expo-router",

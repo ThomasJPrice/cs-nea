@@ -1,5 +1,6 @@
 const express = require('express')
 const authenticateJWT = require('../middleware/auth')
+const logger = require('../config/logger')
 const router = express.Router()
 
 router.use((req, res, next) => {
@@ -13,9 +14,10 @@ router.get('/', authenticateJWT, async (req, res) => {
       "SELECT * FROM layouts WHERE user_id = ?",
       [req.user.userId]
     );
+    logger.info(`Layouts fetched for user_id=${req.user.userId}`);
     res.status(200).json(layouts);
   } catch (error) {
-    console.error("Error fetching layouts:", error);
+    logger.error("Error fetching layouts: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -33,6 +35,7 @@ router.post('/', authenticateJWT, async (req, res) => {
       [name, JSON.stringify(config), req.user.userId]
     );
 
+    logger.info(`Layout created: id=${result.lastID}, user_id=${req.user.userId}`);
     res.status(201).json({
       id: result.lastID,
       name,
@@ -42,7 +45,7 @@ router.post('/', authenticateJWT, async (req, res) => {
       updated_at: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Error creating layout:", error);
+    logger.error("Error creating layout: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -58,6 +61,7 @@ router.get('/:id', authenticateJWT, async (req, res) => {
       return res.status(404).send("Layout not found");
     }
 
+    logger.info(`Layout info fetched: id=${layout.id}, user_id=${layout.user_id}`);
     res.status(200).json({
       id: layout.id,
       name: layout.name,
@@ -67,7 +71,7 @@ router.get('/:id', authenticateJWT, async (req, res) => {
       updated_at: layout.updated_at
     });
   } catch (error) {
-    console.error("Error fetching layout:", error);
+    logger.error("Error fetching layout: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -103,9 +107,10 @@ router.put('/:id', authenticateJWT, async (req, res) => {
       return res.status(404).send("Layout not found");
     }
 
+    logger.info(`Layout updated: id=${req.params.id}, user_id=${req.user.userId}`);
     res.status(200).send("Layout updated successfully");
   } catch (error) {
-    console.error("Error updating layout:", error);
+    logger.error("Error updating layout: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -121,9 +126,10 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
       return res.status(404).send("Layout not found");
     }
 
+    logger.info(`Layout deleted: id=${req.params.id}, user_id=${req.user.userId}`);
     res.status(200).send("Layout deleted successfully");
   } catch (error) {
-    console.error("Error deleting layout:", error);
+    logger.error("Error deleting layout: " + error);
     res.status(500).send("Internal server error");
   }
 });

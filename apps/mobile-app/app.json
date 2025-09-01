@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "my-expo-app",
-    "slug": "my-expo-app",
+    "name": "LED Display Controller",
+    "slug": "led-display-controller",
     "version": "1.0.0",
-    "scheme": "my-expo-app",
+    "scheme": "led-display-controller",
     "web": {
       "bundler": "metro",
       "output": "static",

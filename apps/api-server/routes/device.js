@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const logger = require('../config/logger')
 
 const jwt = require('jsonwebtoken');
 const authenticateJWT = require('../middleware/auth');
@@ -16,6 +17,7 @@ router.post('/register', async (req, res) => {
   // device endpoint - check secret
   const providedSecret = req.headers['x-device-secret'];
   if (providedSecret !== DEVICE_SECRET) {
+    logger.warn("Device registration attempt with invalid secret");
     return res.status(401).send("Invalid device secret");
   }
 
@@ -35,7 +37,7 @@ router.post('/register', async (req, res) => {
       "INSERT INTO devices (name, pairing_code, updated_at) VALUES (?, ?, datetime('now', 'localtime'))",
       [name, pairingCode]
     )
-
+    logger.info(`Device registered: name=${name}, pairing_code=${pairingCode}`);
     res.status(201).json({
       id: device.id,
       name,
@@ -43,7 +45,7 @@ router.post('/register', async (req, res) => {
     })
 
   } catch (error) {
-    console.error("Error registering device:", error);
+    logger.error("Error registering device: " + error);
     res.status(500).send("Internal server error");
   }
 })
@@ -52,6 +54,7 @@ router.post('/pair', authenticateJWT, async (req, res) => {
   const { pairing_code } = req.body;
 
   if (!pairing_code) {
+    logger.warn("Pairing attempt without pairing code");
     return res.status(400).send("Pairing code is required");
   }
 
@@ -62,6 +65,7 @@ router.post('/pair', authenticateJWT, async (req, res) => {
     )
 
     if (!device) {
+      logger.warn(`Pairing attempt with invalid code: ${pairing_code}`);
       return res.status(404).send("Device not found");
     }
 
@@ -69,14 +73,14 @@ router.post('/pair', authenticateJWT, async (req, res) => {
       "UPDATE devices SET user_id = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
       [req.user.userId, device.id]
     )
-
+    logger.info(`Device paired: id=${device.id}, user_id=${req.user.userId}`);
     res.status(200).json({
       id: device.id,
       name: device.name,
       paired: true
     })
   } catch (error) {
-    console.error("Error pairing device:", error);
+    logger.error("Error pairing device: " + error);
     res.status(500).send("Internal server error");
   }
 })
@@ -91,9 +95,11 @@ router.get('/:id', authenticateJWT, async (req, res) => {
     );
 
     if (!device) {
+      logger.warn(`Device fetch attempt for non-existent device id=${id}`);
       return res.status(404).send("Device not found");
     }
 
+    logger.info(`Device info fetched: id=${device.id}, user_id=${device.user_id}`);
     res.status(200).json({
       id: device.id,
       name: device.name,
@@ -101,7 +107,7 @@ router.get('/:id', authenticateJWT, async (req, res) => {
       paired: !!device.user_id
     });
   } catch (error) {
-    console.error("Error fetching device:", error);
+    logger.error("Error fetching device: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -116,6 +122,7 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
     );
 
     if (!device) {
+      logger.warn(`Disconnect attempt for non-existent device id=${id}`);
       return res.status(404).send("Device not found");
     }
 
@@ -123,14 +130,14 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
       "UPDATE devices SET user_id = NULL, updated_at = datetime('now', 'localtime') WHERE id = ?",
       [device.id]
     );
-
+    logger.info(`Device disconnected: id=${device.id}`);
     res.status(200).json({
       id: device.id,
       name: device.name,
       paired: false
     });
   } catch (error) {
-    console.error("Error disconnecting device:", error);
+    logger.error("Error disconnecting device: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -146,6 +153,7 @@ router.put('/:id', authenticateJWT, async (req, res) => {
     );
 
     if (!device) {
+      logger.warn(`Update attempt for non-existent device id=${id}`);
       return res.status(404).send("Device not found");
     }
 
@@ -168,14 +176,14 @@ router.put('/:id', authenticateJWT, async (req, res) => {
       `UPDATE devices SET ${updates.join(', ')} WHERE id = ?`,
       params
     );
-
+    logger.info(`Device updated: id=${device.id}, name=${name}, current_layout_id=${current_layout_id}`);
     res.status(200).json({
       id: device.id,
       name: name !== undefined ? name : device.name,
       current_layout_id: current_layout_id !== undefined ? current_layout_id : device.current_layout_id
     });
   } catch (error) {
-    console.error("Error updating device:", error);
+    logger.error("Error updating device: " + error);
     res.status(500).send("Internal server error");
   }
 });
@@ -186,9 +194,10 @@ router.get('/', authenticateJWT, async (req, res) => {
       "SELECT * FROM devices WHERE user_id = ?",
       [req.user.userId]
     );
+    logger.info(`Devices fetched for user_id=${req.user.userId}`);
     res.status(200).json(devices);
   } catch (error) {
-    console.error("Error fetching devices:", error);
+    logger.error("Error fetching devices: " + error);
     res.status(500).send("Internal server error");
   }
 });
